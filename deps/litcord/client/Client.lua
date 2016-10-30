@@ -59,7 +59,7 @@ function Client:openDirectMessage (recipient_id)
 	dmChannel = self.rest:request(
 		{
 			method = 'POST',
-			path = self.rest.endPoints.GET_ME_DMS,
+			path = self.rest.endPoints.ME_DMS,
 			data = {
 				recipient_id = recipient_id,
 			},

@@ -30,6 +30,8 @@ function StripWhitespace( str )
 	return str:gsub("%s", "")
 end
 
+--local debug_html = 'd:\\'
+
 client:login({ token = secrets.discordToken })
 
 client:on(
@@ -51,14 +53,16 @@ client:on(
 	'message',
 	function(message)
 		local channelName = message.channel.name or '?'
-		local log = os.date('!%H_%M_%S')..' : #'..channelName:gsub(":", "::")..' : '..message.author.username:gsub(":", "::")..' : '..message.cleanContent:gsub(":", "::")..' : ';
+		local log = os.date('!%H_%M_%S')..' : #'..channelName:gsub(":", "::")..' : '..message.author.username:gsub(":", "::")..'('..message.author.id..')'..' : '..message.cleanContent:gsub(":", "::")..' : ';
 		--if( message.author.id == '109587405673091072' ) then
 		--	message.channel:sendMessage('<@!109587405673091072> Hi')
 		--end
 		
 		local file = io.open('logs/'..os.date("!%Y_%m_%d")..'.log', 'a')
-		file:write(log..'\n')
-		file:close()
+		if file then
+			file:write(log..'\n')
+			file:close()
+		end
 		
 		print( log )
 		
@@ -66,8 +70,10 @@ client:on(
 )
 
 local file = io.open('logs/'..os.date("!%Y_%m_%d")..'.log', 'a')
-file:write(os.date('!%H_%M_%S')..'--STARTING UP--\n')
-file:close()
+if file then
+	file:write(os.date('!%H_%M_%S')..'--STARTING UP--\n')
+	file:close()
+end
 
 local responses = { 'Does not compute.', 'Error Code: 1337', 'Say what?', 'Type !help for commands', '<http://www.gamedev.net/page/index.html>', "Well, there's always the singleplayer campaign." }
 --TODO - Interactions
@@ -218,9 +224,11 @@ function GdnPostLogin()
 		print('* Login error.')
 		return false
 	end
-	local file = io.open ('d:/test.html', 'w')
-	file:write(received)
-	file:close()
+	if debug_html then
+		local file = io.open (debug_html..'test.html', 'w')
+		file:write(received)
+		file:close()
+	end
 	return true
 end
 
@@ -234,8 +242,8 @@ function GdnGetMessages()
 			referer = 'http://www.gamedev.net/page/index.html',
 		}
 	)
-	if success then
-		local file = io.open ('d:/test.html', 'w')
+	if success and debug_html then
+		local file = io.open (debug_html..'messages.html', 'w')
 		file:write(received)
 		file:close()
 	end
@@ -352,29 +360,58 @@ client:on(
 			if verified_users[message.author.id] and verified_users[message.author.id].gdnUrl then
 				message:reply('You have already claimed <'..verified_users[message.author.id].gdnUrl..'>')
 			else
-				if not message.author.channel then
-					client:openDirectMessage(message.author.id)
-				end
-				
-				if message.author.channel then
-					message.author.channel:sendMessage(content)
-					
-					if message.author.channel ~= message.channel then
-						message:reply('Check your direct messages')
-					end
-				else
+				--if not message.author.channel then
+				--	client:openDirectMessage(message.author.id)
+				--end
+				--
+				--if message.author.channel then
+				--	message.author.channel:sendMessage(content)
+				--	
+				--	if message.author.channel ~= message.channel then
+				--		message:reply('Check your direct messages')
+				--	end
+				--else
+				--	message:reply('For some reason I cannot direct message you! Please send me a direct message to open the channel for me :kissing_heart:')
+				--end
+				if nil == message.author:sendMessage(content) then
 					message:reply('For some reason I cannot direct message you! Please send me a direct message to open the channel for me :kissing_heart:')
+				else
+					message:reply('I\'ve sent a direct message :kissing_heart:')
 				end
 			end
 		elseif message.cleanContent:starts('!help') then
 			local exampleUsers = { 'yoshi', 'dsm' }
-			message.channel:sendMessage('**List of commands:\n'
+			local content = ('**List of commands:\n'
 				..'`!claim`: Link your GameDev.net profile to your discord account.\n'
 				..'`!profile`: Find someone\'s GameDev.net profile (e.g. !profile @'..exampleUsers[math.random(#exampleUsers)]..').\n'
 				)
+				
+			if nil == message.author:sendMessage(content) then
+				message:reply('For some reason I cannot direct message you! Please send me a direct message to open the channel for me :kissing_heart: \n'..content)
+			else
+				message:reply('I\'ve sent a direct message :kissing_heart:')
+			end
+		elseif message.cleanContent:starts('!mute') then
+			if IsModerator(message.author) then
+				message:reply("ok")
+			end
 		end
 	end
 )
+
+function IsModerator(user)
+	server = client.servers:get('id', config.gdnetServerId)
+	local roleId = 0
+	for k,v in pairs(server.roles.__data) do
+		if v.name == 'Moderators' then
+			roleId = v.id
+			break
+		end
+	end
+	
+	local member = server.members:get('id', user.id)
+	return table.contains(member.roles, roleId)
+end
 
 local allowed_groups = {
 	['Banned'] = true,
@@ -424,8 +461,8 @@ function GdnPostPmReplies(server)
 			referer = 'http://www.gamedev.net/page/index.html',
 		})
 		
-		if success then
-			local file = io.open ('d:/msg_'..item.gdnTopicId..'.html', 'w')
+		if success and debug_html then
+			local file = io.open (debug_html..'msg_'..item.gdnTopicId..'.html', 'w')
 			file:write(received)
 			file:close()
 		end
@@ -465,10 +502,12 @@ function GdnPostPmReplies(server)
 				}
 			})
 			if success and not received:find('The following errors were found', 1, true) then
-				print( 'Sent PM!' )				
-				local file = io.open ('d:/reply_'..item.gdnTopicId..'.html', 'w')
-				file:write(received)
-				file:close()
+				print( 'Sent PM!' )		
+				if debug_html then 
+					local file = io.open (debug_html..'reply_'..item.gdnTopicId..'.html', 'w')
+					file:write(received)
+					file:close()
+				end
 			else
 				print( 'Error sending PM!' )
 				failed = true
@@ -509,9 +548,11 @@ function GdnGetQueuedProfiles(server)
 			referer = 'http://www.gamedev.net/page/index.html',
 		})
 		if success and response.code < 400 then
-			local file = io.open ('d:/profile_'..discordUserId..'.html', 'w')
-			file:write(received)
-			file:close()
+			if debug_html then
+				local file = io.open (debug_html..'profile_'..discordUserId..'.html', 'w')
+				file:write(received)
+				file:close()
+			end
 			
 			local pattern = "<span class='row_title'>Group</span>(.-)</span>"
 			group = StripWhitespace(StripTags( received:match(pattern) ))
@@ -615,7 +656,7 @@ function VerifyUser( server, message, gdnTopicId )
 	if not member then
 		print( message.gdnName..' sent a claim for a missing member?' )
 		gdn_dirty = true
-		table.insert( pm_reply_queue, {gdnTopicId=gdnTopicId, content='something went wrong when .' } )
+		table.insert( pm_reply_queue, {gdnTopicId=gdnTopicId, content='something went wrong...' } )
 		return true
 	end
 	
@@ -689,9 +730,11 @@ function GdnGetQueuedMessages()
 			referer = 'http://www.gamedev.net/page/index.html',
 		})
 		if success and response.code < 400 then
-			local file = io.open ('d:/message_'..gdnTopicId..'.html', 'w')
-			file:write(received)
-			file:close()
+			if debug_html then
+				local file = io.open (debug_html..'message_'..gdnTopicId..'.html', 'w')
+				file:write(received)
+				file:close()
+			end
 			
 			local subjectPattern = "<h2 class='maintitle'>(.-)</h2>"
 			local subject = StripWhitespace(StripTags(received:match(subjectPattern)))
@@ -710,7 +753,7 @@ function GdnGetQueuedMessages()
 			gdn_dirty = true
 			messages_queued[gdnTopicId] = nil
 			messages_fetched[gdnTopicId] = { type=subject:lower(), gdnId=authorId, gdnUrl=profileUrl, gdnName=authorName, content=content }
-		--	print_r(messages_fetched[gdnTopicId])
+			print_r(messages_fetched[gdnTopicId])
 		end
 	end
 	
@@ -727,14 +770,14 @@ function GdnParseMessages(success, response, received)
 	
 	--local pattern2 = '(%d+)"'
 	
-	--print( 'parsing' )
+	print( 'parsing' )
 	local cursor = 1
 	repeat
 		local _,gdnTopicId
 		_, cursor, gdnTopicId = string.find(received, pattern, cursor)
 		if gdnTopicId then
 			if messages_fetched[gdnTopicId] == nil and messages_queued[gdnTopicId] == nil and messages_processed[gdnTopicId] == nil then
-				--print( 'message#'..gdnTopicId )
+				print( 'message#'..gdnTopicId )
 				gdn_dirty = true
 				messages_queued[gdnTopicId] = 'http://www.gamedev.net/index.php?app=members&module=messaging&section=view&do=showConversation&topicID='..gdnTopicId
 			end
@@ -755,7 +798,7 @@ local litcord_constants = require('litcord/constants')
 client:on(
 	{
 		litcord_constants.events.GUILD_CREATE,
-		litcord_constants.events.GUILD_UPDATE,
+	--	litcord_constants.events.GUILD_UPDATE,
 	},
 	function(data)
 		--timer.sleep(500)
@@ -772,7 +815,7 @@ client:on(
 			print('Connected to a server that doesn\'t exist??')
 		end
 	
-			print('Connected to '..data.name..' : '..data.id)
+		print('Connected to '..data.name..' : '..data.id)
 		
 		if data.id == config.gdnetServerId then
 			
@@ -786,7 +829,7 @@ client:on(
 				GdnParseMessages(GdnGetMessages())
 			end
 			SaveGDNState(true)
-			timer.sleep(1000*60)
+			timer.sleep(1000*120)
 		end
 		--end)() 
 		end
@@ -794,15 +837,15 @@ client:on(
 )
 
 
-client:on(
-	'message',
-	function(message)
-		if string.find(message.cleanContent, 'foobar') then
-		else
-		return
-		end
-		
-GdnGetQueuedMessages()
-		
-	end
-)
+--client:on(
+--	'message',
+--	function(message)
+--		if string.find(message.cleanContent, 'foobar') then
+--		else
+--		return
+--		end
+--		
+--		GdnGetQueuedMessages()
+--		
+--	end
+--)
