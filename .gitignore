@@ -1,3 +1,6 @@
 /logs/*.log
 /backup/gdn_*
 /secret/secrets.luadeps
+/secret/secrets.lua
+
+/gdn_state

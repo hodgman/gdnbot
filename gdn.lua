@@ -29,8 +29,10 @@ end
 function StripWhitespace( str )
 	return str:gsub("%s", "")
 end
+local function istable(t) return type(t) == 'table' end
 
---local debug_html = 'd:\\'
+
+--local debug_html = 'd:\\' --Don't commit!!
 
 client:login({ token = secrets.discordToken })
 
@@ -302,11 +304,12 @@ function SaveGDNState(backup, backup_only)
 		gdn_user_to_secret = gdn_user_to_secret,
 		gdn_secret_to_user = gdn_secret_to_user,
 	}
+	local blacklist = { 'responseChannel' }
 	if not backup_only then 
-		gdutils.saveFile('gdn_state', state)
+		gdutils.saveFile('gdn_state', state, blacklist)
 	end
 	if backup then
-		gdutils.saveFile('backup/gdn_state'..os.time(), state)
+		gdutils.saveFile('backup/gdn_state'..os.time(), state, blacklist)
 	end
 end
 
@@ -395,6 +398,36 @@ client:on(
 			if IsModerator(message.author) then
 				message:reply("ok")
 			end
+		elseif message.cleanContent:starts('!say ') then
+			if IsModerator(message.author) then
+			
+				local pattern = '!say #(.-) (.*)'
+				local channelName, content = message.cleanContent:match(pattern)
+				if channelName == nil then
+					channelName = 'botdev'
+					pattern = '!say (.*)'
+					content = message.cleanContent:match(pattern)
+				end
+				local channel = nil
+				for k,v in pairs(client.__channels.__data) do
+					if v.name == channelName then
+						channel = v
+						break
+					end
+				end
+				if channel then
+					if content == nil then
+						content = message.cleanContent:sub(5, -1)
+					end
+					channel:sendMessage(content)
+				end
+			end
+		elseif message.cleanContent:starts('!regroup') then
+			if IsModerator(message.author) then
+				message:reply("ok")
+				GdnCheckIncompleteProfiles(true, message)
+				SaveGDNState()
+			end
 		end
 	end
 )
@@ -403,7 +436,7 @@ function IsModerator(user)
 	server = client.servers:get('id', config.gdnetServerId)
 	local roleId = 0
 	for k,v in pairs(server.roles.__data) do
-		if v.name == 'Moderators' then
+		if v.name == 'Moderators' or v.name == 'Staff' then
 			roleId = v.id
 			break
 		end
@@ -414,37 +447,24 @@ function IsModerator(user)
 end
 
 local allowed_groups = {
-	['Banned'] = true,
-	['Crossbones'] = true,
+	['Muted'] = true,
+	['GDNet+'] = true,
 	['Moderators'] = true,
 	['Members'] = true,
 	['Staff'] = true,
 }
 local group_remap = {
-	--'Banned' = '',
-	--'Crossbones' = '',
-	--'Moderators' = '',
-	--'Members' = '',
-	--'Staff' = '',
-	[StripWhitespace('Senior Staff')] = 'Staff',
-	[StripWhitespace('Staff Emeritus')] = 'Staff',
-	[StripWhitespace('Senior Moderators')] = 'Moderators',
-	[StripWhitespace('SM Post Editors')] = 'Moderators',
-	[StripWhitespace('Distinguished Rhino')] = 'Moderators',
-	[StripWhitespace('GDNet+')] = 'Crossbones',
-	[StripWhitespace('GDNet+ Beanstalk')] = 'Crossbones',
-	[StripWhitespace('Peer Reviewers')] = 'Crossbones',
-	[StripWhitespace('Prime Members')] = 'Crossbones',
-	[StripWhitespace('Moderated Users')] = 'Banned',
-	[StripWhitespace('Active Non-Survey Takers')] = 'Members',
-	[StripWhitespace('Unlimited Classifieds')] = 'Members',
-	[StripWhitespace('Guests')] = 'Members',
-	[StripWhitespace('Link Managers')] = 'Members',
-	[StripWhitespace('Marketplace File Submitters')] = 'Members',
-	[StripWhitespace('Marketplace Seller')] = 'Members',
-	[StripWhitespace('Moderator*')] = 'Members',
-	[StripWhitespace('Partners')] = 'Members',
-	[StripWhitespace('Validating')] = 'Members',
+	[StripWhitespace('Staff')]                       = { 'Staff', 'Moderators', 'Members' },
+	[StripWhitespace('Senior Staff')]                = { 'Staff', 'Moderators', 'Members' },
+	[StripWhitespace('Moderators')]                  = { 'Moderators', 'Members' },
+	[StripWhitespace('Senior Moderators')]           = { 'Moderators', 'Members' },
+	[StripWhitespace('SM Post Editors')]             = { 'Moderators', 'Members' },
+	[StripWhitespace('Distinguished Rhino')]         = { 'Moderators', 'Members' },
+	[StripWhitespace('GDNet+')]                      = { 'GDNet+', 'Members' },
+	[StripWhitespace('GDNet+ Beanstalk')]            = { 'GDNet+', 'Members' },
+	[StripWhitespace('Moderated Users')]             = { 'Muted', 'Members' },
+	[StripWhitespace('Banned')]                      = { 'Muted', 'Members' },
+	['default']                                      = 'Members',
 }
 
 
@@ -528,12 +548,70 @@ function GdnPostPmReplies(server)
 	
 end
 
-function GdnCheckIncompleteProfiles()
+function GdnCheckIncompleteProfiles(force, responseChannel)
 	for userId, item in pairs(verified_users) do
-		if item.group == nil and item.gdnUrl and userId and not user_profile_queue[item.gdnUrl] then
+		if (item.group == nil or force) and item.gdnUrl and userId and not user_profile_queue[item.gdnUrl] then
 			gdn_dirty = true
-			user_profile_queue[item.gdnUrl] = { discordUserId=userId };
+			user_profile_queue[item.gdnUrl] = { discordUserId=userId, responseChannel=responseChannel };
 		end
+	end
+end
+
+
+function AddUserToGroup(server, discordUserId, group)
+	local roleId = 0
+	for k,v in pairs(server.roles.__data) do
+		if v.name == group then
+			roleId = v.id
+			break
+		end
+	end
+	if not roleId then
+		print( 'Could not find role '..group )
+		return 'Sorry, I failed to add you to '..group..'\n'
+	else
+		local member = server.members:get('id', discordUserId)
+		if not table.contains(member.roles, roleId) then
+		--todo - test new API
+			table.insert(member.roles, roleId)
+			member:edit({ roles = member.roles })
+			print( 'Granted role '..group..' to '..member.user.username )
+			return 'You have been added to '..group..'\n'
+		else
+			print( member.user.username..' already had role '..group )
+			return ''
+		end
+	end
+end
+
+function SetUserGroups(server, discordUserId, groups)
+	local message = ''
+	local roleIds = {}
+	for _,group in ipairs(groups) do
+		local roleId = 0
+		for k,v in pairs(server.roles.__data) do
+			if v.name == group then
+				roleId = v.id
+				break
+			end
+		end
+		if not roleId then
+			print( 'Could not find role '..group )
+			message = message..'Sorry, I failed to add you to '..group..'\n'
+		else
+			table.insert(roleIds, roleId)
+			message = message..'You have been added to '..group..'\n'
+		end
+	end
+	
+	local member = server.members:get('id', discordUserId)
+	--todo - test new API
+	if member then
+		member.roles = roleIds
+		member:edit({ roles = member.roles })
+		return message
+	else
+		return ''
 	end
 end
 
@@ -541,6 +619,7 @@ function GdnGetQueuedProfiles(server)
 	for url, item in pairs(user_profile_queue) do
 		local discordUserId = item.discordUserId
 		local gdnTopicId = item.gdnTopicId
+		local responseChannel = item.responseChannel
 		local success, response, received = httpRequest({
 			method = 'GET',
 			path = url,
@@ -559,19 +638,27 @@ function GdnGetQueuedProfiles(server)
 			
 			if group_remap[group] then
 				group = group_remap[group]
+			else
+				group = group_remap['default']
 			end
 			
-			if group == 'Banned' then
+			--[[if group == 'Banned' then
 				print( 'oh shit, user should be banned' )
 				discordUserId = nil
-			elseif not group then
+			else--]]if not group then
 				discordUserId = nil
 				group = '???'
 			end
 			
-			if not allowed_groups[group] then
-				discordUserId = nil
-				print( 'What is '..group..'?' )
+			if not istable(group) then
+				group = { group }
+			end
+			for _,g in ipairs(group) do
+				if not allowed_groups[g] then
+					print( 'What is '..g..'?' )
+					discordUserId = nil
+					break
+				end
 			end
 			
 			--print( '|'..url..'|'..group..'|' )
@@ -580,48 +667,20 @@ function GdnGetQueuedProfiles(server)
 				gdn_dirty = true
 				verified_users[discordUserId].group = group
 				
-				--print('server roles')
-				local roleId = 0
-				for k,v in pairs(server.roles.__data) do
-				--	print_t(v)
-					if v.name == group then
-						roleId = v.id
-						break
-					end
+				--local pmResponse = ''
+				--for _,g in ipairs(group) do
+				--	pmResponse = pmResponse..AddUserToGroup(server, discordUserId, g)
+				--end
+				local pmResponse = SetUserGroups(server, discordUserId, group)
+		
+				if gdnTopicId and string.len(pmResponse)>0 then
+					table.insert( pm_reply_queue, {gdnTopicId=gdnTopicId, content=pmResponse} )
 				end
-				if not roleId then
-					print( 'Could not find role '..group )
-					
-					if gdnTopicId then
-						gdn_dirty = true
-						table.insert( pm_reply_queue, {gdnTopicId=gdnTopicId, content='Sorry, I failed to add you to '..group} )
-					end
-				else
-					local member = server.members:get('id', discordUserId)
-				--	print( 'type member='..type(member) )
-					print_t(member)
-					print_r(member.roles)
-					if not table.contains(member.roles, roleId) then
-					--todo - test new API
-						table.insert(member.roles, roleId)
-						member:edit({ roles = member.roles })
-						print( 'Granted role '..group..' to '..member.user.username )
-						
-						if gdnTopicId then
-							gdn_dirty = true
-							table.insert( pm_reply_queue, {gdnTopicId=gdnTopicId, content='You have been added to '..group} )
-						end
-				--[[
-					if member:addRole(roleId) then
-						print( 'Granted role '..group..' to '..member.user.username )
-						if gdnTopicId then
-							gdn_dirty = true
-							table.insert( pm_reply_queue, {gdnTopicId=gdnTopicId, content='You have been added to '..group} )
-						end]]
-					else
-						print( member.user.username..' already had role '..group )
-					end
+				if responseChannel and responseChannel.reply and string.len(pmResponse)>0 then
+					responseChannel:reply('Processing '..verified_users[discordUserId].gdnName)
+					responseChannel:reply(pmResponse..'\n')
 				end
+				
 				gdn_dirty = true
 				user_profile_queue[url] = nil
 			end
@@ -710,7 +769,7 @@ function ProcessGdnPmMessages()
 	
 	SaveGDNState()
 	
-	GdnCheckIncompleteProfiles()
+	GdnCheckIncompleteProfiles(false, nil)
 	GdnGetQueuedProfiles(server)
 	
 	--print('user list')
@@ -770,7 +829,7 @@ function GdnParseMessages(success, response, received)
 	
 	--local pattern2 = '(%d+)"'
 	
-	print( 'parsing' )
+--	print( 'parsing' )
 	local cursor = 1
 	repeat
 		local _,gdnTopicId

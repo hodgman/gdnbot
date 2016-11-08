@@ -46,7 +46,8 @@ local function MakeCaseInsensitivePattern(pattern)
 	return pattern
 end
 
-local function serialize(file, o)
+local function serialize(file, o, blacklisted, serialized)
+	serialized = serialized or {}
 	if type(o) == 'number' then
 	--	print('number'..o)
 		file:write(o)
@@ -55,15 +56,19 @@ local function serialize(file, o)
 		file:write(string.format("%q", o))
 	elseif type(o) == 'table' then
 	--	print_t(o)
+	--	serialized[o] = true
 		file:write("{\n")
 		for k,v in pairs(o) do
-			file:write("  [")
-			serialize(file, k)
-			file:write("] = ")
-			serialize(file, v)
-			file:write(",\n")
+			if v ~= o and not serialized[v] and not blacklisted[k] then
+				file:write("  [")
+				serialize(file, k, blacklisted, serialized)
+				file:write("] = ")
+				serialize(file, v, blacklisted, serialized)
+				file:write(",\n")
+			end
 		end
 		file:write("}\n")
+	--	serialized[o] = false
 	elseif type(o) == 'boolean' then
 	--	print('boolean'..(o and 'true' or 'false'))
 		file:write(o and 'true' or 'false')
@@ -77,10 +82,10 @@ local function serialize(file, o)
 end
 
 
-local function saveFile(filename, object)
+local function saveFile(filename, object, blackList)
 	local file = io.open (filename, 'w')
 	file:write('return ')
-	serialize(file, object)
+	serialize(file, object, blackList)
 	file:close()
 end
 
