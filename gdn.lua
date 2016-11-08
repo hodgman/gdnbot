@@ -304,7 +304,7 @@ function SaveGDNState(backup, backup_only)
 		gdn_user_to_secret = gdn_user_to_secret,
 		gdn_secret_to_user = gdn_secret_to_user,
 	}
-	local blacklist = { 'responseChannel' }
+	local blacklist = { responseChannel=true }
 	if not backup_only then 
 		gdutils.saveFile('gdn_state', state, blacklist)
 	end
