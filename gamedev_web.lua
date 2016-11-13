@@ -124,6 +124,19 @@ client:on(
 client:on(
 	'message',
 	function(message)
+		if not message.cleanContent:starts('!regroup') then return end
+		
+		if utils.IsModerator(message.author) then
+			message:reply("ok")
+			GdnCheckIncompleteProfiles(true, message)
+			SaveGDNState()
+		end
+	end
+)
+
+client:on(
+	'message',
+	function(message)
 		if not message.cleanContent:starts('!claim') then return end
 	
 		local secret = gdn_user_to_secret[message.author.id]

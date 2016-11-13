@@ -9,10 +9,15 @@ luvit gdn
 
 But first, you need to get your hands on `secrets.lua` (the passwords) and `gdn_state` (the database)
 
-Docs are here
+if you try to use a part of luvit and your require statement doesn't work, you may have to download the files with lit 
+e.g. lit install luvit/fs
+
+Luvit Docs are here:
 https://luvit.io/api/
 But they're shit, so the nodejs docs may be better:
 https://nodejs.org/api/
 
-if you try to use a part of luvit and your require statement doesn't work, you may have to download the files with lit 
-lit install luvit/fs
+The Lua discord API docs are here:
+https://github.com/satom99/litcord/wiki
+And discord API docs are here:
+https://discordapp.com/developers/docs/reference

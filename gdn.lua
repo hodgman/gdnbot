@@ -95,12 +95,6 @@ client:on(
 					channel:sendMessage(content)
 				end
 			end
-		elseif message.cleanContent:starts('!regroup') then
-			if utils.IsModerator(message.author) then
-				message:reply("ok")
-				GdnCheckIncompleteProfiles(true, message)
-				SaveGDNState()
-			end
 		end
 	end
 )
