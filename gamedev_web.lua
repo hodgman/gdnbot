@@ -93,6 +93,37 @@ end
 client:on(
 	'message',
 	function(message)
+		if not message.cleanContent:starts('!profile') then return end
+		
+		local userId = message.content:match('!profile%s*(.*)%s*')
+		if next(message.mentions) == nil then
+			local found = false
+			userId = userId:lower()
+			for _,v in pairs(verified_users) do
+				if v.gdnName:lower() == userId or v.username:lower() == userId then
+					found = true
+					message.channel:sendMessage(v.gdnName..': <'..v.gdnUrl..'>')
+					break
+				end
+			end
+			if not found then
+				message.channel:sendMessage('usage !profile @user')
+			end
+		else -- they used a propper @Mention
+			for k,v in pairs(message.mentions) do
+				if verified_users[v.id] and verified_users[v.id].gdnUrl then
+					message.channel:sendMessage(v.username..': <'..verified_users[v.id].gdnUrl..'>')
+				else
+					message.channel:sendMessage(v.username..' is not a verified user')
+				end
+			end
+		end
+	end
+)
+
+client:on(
+	'message',
+	function(message)
 		if not message.cleanContent:starts('!claim') then return end
 	
 		local secret = gdn_user_to_secret[message.author.id]

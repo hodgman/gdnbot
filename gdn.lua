@@ -51,29 +51,6 @@ client:on(
 )
 
 
-
-client:on(
-	'message',
-	function(message)
-		if message.cleanContent:sub(1,1) ~= '!' then return end
-		
-		if message.cleanContent:starts('!profile') then
-			local userId = message.content:match('!profile%s*(.-)%s*')
-			if next(message.mentions) == nil then
-				message.channel:sendMessage('usage !profile @user')
-			else
-				for k,v in pairs(message.mentions) do
-					if verified_users[v.id] and verified_users[v.id].gdnUrl then
-						message.channel:sendMessage(v.username..': <'..verified_users[v.id].gdnUrl..'>')
-					else
-						message.channel:sendMessage(v.username..' is not a verified user')
-					end
-				end
-			end
-		end
-	end
-)
-
 	
 client:on(
 	'message',
