@@ -1,4 +1,6 @@
 
+local config = require('./config')
+
 local function print_r ( t )  
     local print_r_cache={}
     local function sub_print_r(t,indent)
@@ -94,6 +96,45 @@ local function loadFile(filename)
 	return f and f() or nil
 end
 
+function string.starts(String,Start)
+   return string.sub(String,1,string.len(Start))==Start
+end
+
+function string.ends(String,End)
+   return End=='' or string.sub(String,-string.len(End))==End
+end
+
+function StripTags( str )
+	return str:gsub("%b<>", "")
+end
+function StripWhitespace( str )
+	return str:gsub("%s", "")
+end
+local function istable(t) return type(t) == 'table' end
+
+function table.contains(table, element)
+  for _, value in pairs(table) do
+    if value == element then
+      return true
+    end
+  end
+  return false
+end
+
+local function IsModerator(user)
+	server = client.servers:get('id', config.gdnetServerId)
+	local roleId = 0
+	for k,v in pairs(server.roles.__data) do
+		if v.name == 'Moderators' or v.name == 'Staff' then
+			roleId = v.id
+			break
+		end
+	end
+	
+	local member = server.members:get('id', user.id)
+	return table.contains(member.roles, roleId)
+end
+
 return {
 	saveFile = saveFile,
 	loadFile = loadFile,
@@ -101,4 +142,8 @@ return {
 	print_r = print_r,
 	print_t = print_t,
 	MakeCaseInsensitivePattern = MakeCaseInsensitivePattern,
+	StripTags = StripTags,
+	StripWhitespace = StripWhitespace,
+	istable = istable,
+	IsModerator = IsModerator,
 }

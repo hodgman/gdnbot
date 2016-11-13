@@ -5,6 +5,7 @@ return {
 	private = true, -- This prevents us from accidentally publishing this package.
 	dependencies = {
 		"satom99/litcord",
+		"luvit/fs",
 	}
 	files = {
 		'*.lua',

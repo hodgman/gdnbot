@@ -1,7 +1,5 @@
 
-local gdutils = require('gdutils')
-local print_r = gdutils.print_r
-local print_t = gdutils.print_t
+local utils = require('./utils')
 
 
 --todo wrap up so censor_table can be modified and saved/loaded
@@ -37,14 +35,14 @@ local fixed_censor_table = {}
 for group, words in pairs( censor_table ) do
 	fixed_censor_table[group] = {}
 	for i, v in pairs( words ) do
-		table.insert( fixed_censor_table[group], gdutils.MakeCaseInsensitivePattern(v) )
+		table.insert( fixed_censor_table[group], utils.MakeCaseInsensitivePattern(v) )
 		if v:sub(-1,-1) == '$' then
 			v = v:sub(1,-2)..'%s'
-			table.insert( fixed_censor_table[group], gdutils.MakeCaseInsensitivePattern(v) )
+			table.insert( fixed_censor_table[group], utils.MakeCaseInsensitivePattern(v) )
 		end
 		if v:sub(1,1) == '^' then
 			v = '%s'..v:sub(2,-1)
-			table.insert( fixed_censor_table[group], gdutils.MakeCaseInsensitivePattern(v) )
+			table.insert( fixed_censor_table[group], utils.MakeCaseInsensitivePattern(v) )
 		end
 	end
 end
@@ -66,7 +64,7 @@ local function Message_Censorship(client, message)
 		drop = 0
 		return
 	end
-	--print_r(fixed_censor_table)
+	--utils.print_r(fixed_censor_table)
 
 	local reason = ''
 	local censorCount = 0
